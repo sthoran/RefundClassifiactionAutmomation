@@ -8,19 +8,15 @@ import datetime
 import logging
 from PIL import Image
 import os
-#from fastapi.responses import FileResponse
 #%%
-# Get the current working directory where the script is located
-PROJECT_DIR = '/Users/user/IUBH/Semester3/frommodeltoproduction'
-# Define the correct paths relative to the project directory
-DATA_DIR = '/Users/user/IUBH/Semester3/frommodeltoproduction/apparel_data'
-CSV_PATH = "/Users/user/IUBH/Semester3/frommodeltoproduction/test_data.csv"
-MODEL_PATH = "/Users/user/IUBH/Semester3/frommodeltoproduction/apparel_classifier_resnet50.h5"
-#%%
-# Check if the model file exists (optional, for debugging purposes)
-if not os.path.exists(MODEL_PATH):
-    print(f"Error: Model file not found at {MODEL_PATH}")
+# Paths for mounted data
+DATA_DIR = "/app/data"  
+CSV_PATH = os.path.join(DATA_DIR, "test_data.csv") 
+
+# Load the CNN model
+MODEL_PATH = os.path.join(DATA_DIR, "apparel_classifier_resnet50.h5")  
 model = tf.keras.models.load_model(MODEL_PATH)
+
 #%%
 # Configure logging
 logging.basicConfig(
@@ -28,7 +24,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.FileHandler("app.log"), logging.StreamHandler()]
 )
-
+#%%
 # Class labels
 CLASS_NAMES = [
     'black_dress', 'black_pants', 'black_shirt', 'black_shoes', 'black_shorts',
@@ -37,20 +33,17 @@ CLASS_NAMES = [
     'green_shoes', 'green_shorts', 'red_dress', 'red_pants',
     'red_shoes', 'white_dress', 'white_pants', 'white_shoes', 'white_shorts'
 ]
-
-# Set the start date for classification
-START_DATE = datetime.datetime.strptime("2025-01-01", "%Y-%m-%d").date()
+#%%
+# Start date for processing
+START_DATE = datetime.datetime.strptime("20250101", "%Y%m%d").date()
 #%%
 # Initialize FastAPI app
 app = FastAPI()
 #%%
-# Global variables for real-time tracking
-CURRENTLY_PROCESSING = START_DATE  # Start from 2025-01-01
-IMAGES_PROCESSED_COUNT = 0  # Tracks number of images classified
-#%%
-# Image Preprocessing Function
-def preprocess_image(image_path):
+# Image Preprocessing Function (Uses Mounted Data)
+def preprocess_image(image_name):
     """Preprocess an image before classification."""
+    image_path = os.path.join(DATA_DIR, "images", image_name) 
     try:
         img = Image.open(image_path).convert("RGB")
         img = img.resize((224, 224))  # Resize for the CNN model
@@ -60,28 +53,33 @@ def preprocess_image(image_path):
     except Exception as e:
         logging.error(f"Error processing image {image_path}: {str(e)}")
         return None
-
-# Image Classification Function
+#%%
+# Global variables for real-time tracking
+CURRENTLY_PROCESSING = None  # Tracks the day being processed
+IMAGES_PROCESSED_COUNT = 0  # Tracks number of images classified
+#%%
+# Image Classification Function: Ensuring No Skipped Days
 def classify_images(target_date: str = None):
     """Classifies images from test_data.csv and ensures all dates are processed sequentially."""
     global CURRENTLY_PROCESSING, IMAGES_PROCESSED_COUNT
 
     try:
-        df = pd.read_csv(CSV_PATH)
+        df = pd.read_csv(CSV_PATH)  
         df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce').dt.date
 
-        # Determine the date to process
+        # Determine the next date to process
         if target_date:
             next_date = datetime.datetime.strptime(target_date, "%Y-%m-%d").date()
         else:
-            next_date = CURRENTLY_PROCESSING
+            last_processed_date = df[df['predicted_label'].notna()]['timestamp'].max() if 'predicted_label' in df.columns else START_DATE
+            next_date = last_processed_date + datetime.timedelta(days=1)
 
         today = datetime.datetime.now().date()
 
         # Ensure processing happens in sequence without skipping days
-        if next_date <= today:
+        while next_date < today:
             logging.info(f"Processing images for {next_date.strftime('%Y-%m-%d')}")
-            CURRENTLY_PROCESSING = next_date  # Track current processing date
+            CURRENTLY_PROCESSING = next_date.strftime('%Y-%m-%d')  # Track current processing date
             IMAGES_PROCESSED_COUNT = 0  # Reset count for this batch
 
             day_images = df[df['timestamp'] == next_date]
@@ -91,8 +89,8 @@ def classify_images(target_date: str = None):
             else:
                 predictions = []
                 for _, row in day_images.iterrows():
-                    image_path = row['filepath']
-                    img = preprocess_image(image_path)
+                    image_name = os.path.basename(row['filepath'])  
+                    img = preprocess_image(image_name)
                     if img is None:
                         continue  
                     pred = model.predict(img)[0]
@@ -101,47 +99,32 @@ def classify_images(target_date: str = None):
                     top_confidence = round(float(pred[top_class_idx]) * 100, 2)
 
                     predictions.append(f"{top_class_name} ({top_confidence}%)")
-                    IMAGES_PROCESSED_COUNT += 1  # Increment image count for each processed image
+                    IMAGES_PROCESSED_COUNT += 1  # Track images classified
 
                 # Update CSV with predictions
-                # **Fix**: Ensure predictions list matches the rows in DataFrame
-                if len(predictions) == len(day_images):
-                    df.loc[df['timestamp'] == next_date, 'predicted_label'] = predictions
-                else:
-                    logging.error("The number of predictions does not match the number of images for the date.")
-                    return {
-                        "message": "Error: Predictions count does not match image count.",
-                        "images_processed_count": IMAGES_PROCESSED_COUNT
-                    }
-                df.to_csv(CSV_PATH, index=False)
+                df.loc[df['timestamp'] == next_date, 'predicted_label'] = predictions
+                df.to_csv(CSV_PATH, index=False)  # 
                 logging.info(f"Processed {IMAGES_PROCESSED_COUNT} images for {next_date.strftime('%Y-%m-%d')}.")
 
-            # Increment date for the next round of processing 
-            CURRENTLY_PROCESSING += datetime.timedelta(days=1)
-            logging.info(f"Next day to process: {CURRENTLY_PROCESSING}")
-        else:
-            logging.warning(f"Processing for {next_date.strftime('%Y-%m-%d')} is skipped as it is in the future.")
-        
-        return {
-            "message": "Classification completed.",
-            "images_processed_count": IMAGES_PROCESSED_COUNT  # Return images processed count
-        }
+            next_date += datetime.timedelta(days=1)  # Move to next date
+
+        CURRENTLY_PROCESSING = None  # Reset after completion
+
+        return {"message": "All unprocessed days have been classified successfully."}
 
     except Exception as e:
         logging.error(f"Error during batch processing: {str(e)}")
         CURRENTLY_PROCESSING = None
-        return {
-            "message": f"Error: {str(e)}",
-            "images_processed_count": IMAGES_PROCESSED_COUNT  # Return processed count in case of error
-        }
+        return {"message": f"Error: {str(e)}"}
 #%%
 # APScheduler Initialization (Midnight Trigger for Production)
 scheduler = BackgroundScheduler()
 scheduler.add_job(classify_images, "cron", hour=0, minute=0, id="midnight_trigger")
 scheduler.start()
-logging.info("Midnight trigger scheduled for daily batch processing.")
+logging.info("APScheduler started for daily midnight batch processing.")
 #%%
 # API Endpoints
+
 @app.get("/")
 def home():
     """Check if the API is running."""
@@ -150,45 +133,31 @@ def home():
 @app.get("/next_date")
 def get_next_date():
     """Check the next scheduled processing date."""
-    return {"next_processing_date": (CURRENTLY_PROCESSING + datetime.timedelta(days=1)).strftime('%Y-%m-%d')}
+    df = pd.read_csv(CSV_PATH)  
+    df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce').dt.date
+    last_processed_date = df[df['predicted_label'].notna()]['timestamp'].max() if 'predicted_label' in df.columns else START_DATE
+    return {"next_processing_date": (last_processed_date + datetime.timedelta(days=1)).strftime('%Y-%m-%d')}
 
 @app.post("/trigger")
-def manual_trigger(target_date):
+def manual_trigger(date: str = None):
     """Manually trigger classification for a specific date."""
-    result = classify_images(target_date=CURRENTLY_PROCESSING.strftime("%Y-%m-%d"))
-    return result
+    result = classify_images(target_date=date)
+    return {"message": result}
 
-# 1-Minute Trigger (Only for Testing)
-@app.post("/start_1min_trigger")
+# 5-Minute Trigger (Only for Testing)
+@app.post("/start_5min_trigger")
 def start_test_trigger():
-    """Starts a test trigger to classify one day's images every 5 minutes."""
-    global CURRENTLY_PROCESSING
-
-    # Ensure CURRENTLY_PROCESSING is initialized
-    if CURRENTLY_PROCESSING is None:
-        CURRENTLY_PROCESSING = START_DATE
-
-    logging.info(f" 1-minute test trigger started from {CURRENTLY_PROCESSING}")  
+    """Manually starts the 5-minute batch processing test."""
+    logging.info("5-minute batch processing trigger activated.")
 
     def process_next_day():
         global CURRENTLY_PROCESSING
+        CURRENTLY_PROCESSING = datetime.datetime.now().strftime('%Y-%m-%d')  
+        classify_images()
+        CURRENTLY_PROCESSING = None  
 
-        logging.info(f"Classifying images for {CURRENTLY_PROCESSING}")  
-
-        # Call classify_images() normally
-        result = classify_images(target_date=CURRENTLY_PROCESSING.strftime("%Y-%m-%d"))
-        logging.info(f"Classification result: {result}")
-
-        # Move to the next day
-        CURRENTLY_PROCESSING += datetime.timedelta(days=1)
-        logging.info(f"Next day set to {CURRENTLY_PROCESSING}")
-
-    # Schedule the process every 1 minutes
-    scheduler.add_job(process_next_day, "interval", minutes=1, id="test_trigger", replace_existing=True)
-    logging.info("1-minute test trigger scheduled successfully.")
-    
-    return {"message": "1-minute test trigger activated!"}
-
+    scheduler.add_job(process_next_day, "interval", minutes=5, id="test_trigger", replace_existing=True)
+    return {"message": "5-minute test trigger activated!"}
 
 @app.get("/processing_status")
 def get_processing_status():
@@ -198,16 +167,9 @@ def get_processing_status():
         "images_processed_last_run": IMAGES_PROCESSED_COUNT
     }
 
-@app.get("/list_jobs")
-def list_jobs():
-    """Lists all scheduled jobs."""
-    return {"jobs": [str(job) for job in scheduler.get_jobs()]}
-
-@app.post("/stop_1-min_trigger")
+@app.post("/stop_5min_trigger")
 def stop_test_trigger():
-    """Stops the 1-minute test trigger."""
+    """Stops the manually activated 5-minute batch processing."""
     scheduler.remove_job("test_trigger")
-    return {"message": "1-minute test trigger stopped!"}
-
-
+    return {"message": "5-minute test trigger stopped!"}
 
