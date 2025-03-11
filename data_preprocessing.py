@@ -11,6 +11,7 @@ import random
 project_root = os.getcwd()  # Gets the current project directory
 
 # Allow user to specify dataset path, otherwise use default
+zip_file_path = os.path.join(project_root, "apparel_images_dataset.zip")
 dataset_path = os.path.join(project_root, "apparel_images_dataset")  # Default dataset path
 
 # Check if dataset exists before proceeding
