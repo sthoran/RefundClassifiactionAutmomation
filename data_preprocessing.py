@@ -6,13 +6,14 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from PIL import Image
 import random
+from sklearn.model_selection import train_test_split
 
 #%% **Step 1: Define Dataset Path Dynamically**
 project_root = os.getcwd()  # Gets the current project directory
 
 # Allow user to specify dataset path, otherwise use default
-zip_file_path = os.path.join(project_root, "archive.zip")
-dataset_path = os.path.join(project_root, "archive")  # Default dataset path
+#zip_file_path = os.path.join(project_root, "archive.zip")
+dataset_path = os.path.join(project_root, "apparel_images_dataset")  
 
 # Check if dataset exists before proceeding
 if not os.path.exists(dataset_path):
@@ -127,11 +128,17 @@ print(f"Augmented data saved! Total dataset size: {len(df_final)}")
 #%% **Step 8: Read CSV and Convert Back to Full Paths for Use**
 df_final = pd.read_csv(csv_filename)
 
-# Convert relative paths back to full paths when loading images
-#df_final["filepath"] = df_final["filepath"].apply(lambda x: os.path.join(project_root, x))
-
 print(df_final.head())  # Check the loaded paths
 
+# Split into train (80%) and test (20%) sets
+train_df, test_df = train_test_split(df, test_size=0.2, random_state=42, stratify=df["label"])
+
+# Save the subsets as CSV files
+train_csv = "apparel_images_train.csv"
+test_csv = "apparel_images_test.csv"
+
+train_df.to_csv(train_csv, index=False)
+test_df.to_csv(test_csv, index=False)
 #%% **Step 9: Check Final Class Distribution**
 class_counts_final = df_final['label'].value_counts()
 
@@ -143,3 +150,5 @@ plt.xlabel("Categories")
 plt.ylabel("Number of Images")
 plt.xticks(rotation=90)
 plt.show()
+
+# %%
