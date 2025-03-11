@@ -15,7 +15,7 @@ dataset_path = os.path.join(project_root, "apparel_images_dataset")  # Default d
 
 # Check if dataset exists before proceeding
 if not os.path.exists(dataset_path):
-    raise FileNotFoundError(f" Dataset path not found: {dataset_path}\nMake sure 'apparel_data/images' exists!")
+    raise FileNotFoundError(f" Dataset path not found: {dataset_path}\nMake sure 'apparel_images_dataset' exists!")
 
 print(f"Dataset path found: {dataset_path}")
 
