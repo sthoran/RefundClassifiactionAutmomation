@@ -10,11 +10,11 @@ from PIL import Image
 import os
 #%%
 # Paths for mounted data
-DATA_DIR = "/app/data"  # 🔴 Mounted Data Directory
-CSV_PATH = os.path.join(DATA_DIR, "test_data.csv")  # 🔴 Ensure CSV is read from mounted volume
+DATA_DIR = "/app/data"  
+CSV_PATH = os.path.join(DATA_DIR, "test_data.csv") 
 
 # Load the CNN model
-MODEL_PATH = os.path.join(DATA_DIR, "apparel_classifier_resnet50.h5")  # 🔴 Load model from mounted data
+MODEL_PATH = os.path.join(DATA_DIR, "apparel_classifier_resnet50.h5")  
 model = tf.keras.models.load_model(MODEL_PATH)
 
 #%%
@@ -40,10 +40,10 @@ START_DATE = datetime.datetime.strptime("20250101", "%Y%m%d").date()
 # Initialize FastAPI app
 app = FastAPI()
 #%%
-# 🔴 Image Preprocessing Function (Uses Mounted Data)
+# Image Preprocessing Function (Uses Mounted Data)
 def preprocess_image(image_name):
     """Preprocess an image before classification."""
-    image_path = os.path.join(DATA_DIR, "images", image_name)  # 🔴 Image file is read from mounted data directory
+    image_path = os.path.join(DATA_DIR, "images", image_name) 
     try:
         img = Image.open(image_path).convert("RGB")
         img = img.resize((224, 224))  # Resize for the CNN model
@@ -58,13 +58,13 @@ def preprocess_image(image_name):
 CURRENTLY_PROCESSING = None  # Tracks the day being processed
 IMAGES_PROCESSED_COUNT = 0  # Tracks number of images classified
 #%%
-# 🔴 Image Classification Function: Ensuring No Skipped Days
+# Image Classification Function: Ensuring No Skipped Days
 def classify_images(target_date: str = None):
     """Classifies images from test_data.csv and ensures all dates are processed sequentially."""
     global CURRENTLY_PROCESSING, IMAGES_PROCESSED_COUNT
 
     try:
-        df = pd.read_csv(CSV_PATH)  # 🔴 Read from mounted CSV
+        df = pd.read_csv(CSV_PATH)  
         df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce').dt.date
 
         # Determine the next date to process
@@ -78,18 +78,18 @@ def classify_images(target_date: str = None):
 
         # Ensure processing happens in sequence without skipping days
         while next_date < today:
-            logging.info(f"🚀 Processing images for {next_date.strftime('%Y-%m-%d')}")
+            logging.info(f"Processing images for {next_date.strftime('%Y-%m-%d')}")
             CURRENTLY_PROCESSING = next_date.strftime('%Y-%m-%d')  # Track current processing date
             IMAGES_PROCESSED_COUNT = 0  # Reset count for this batch
 
             day_images = df[df['timestamp'] == next_date]
 
             if day_images.empty:
-                logging.warning(f"⚠️ No images found for {next_date.strftime('%Y-%m-%d')}. Moving to next day.")
+                logging.warning(f"No images found for {next_date.strftime('%Y-%m-%d')}. Moving to next day.")
             else:
                 predictions = []
                 for _, row in day_images.iterrows():
-                    image_name = os.path.basename(row['filepath'])  # 🔴 Extract only the filename
+                    image_name = os.path.basename(row['filepath'])  
                     img = preprocess_image(image_name)
                     if img is None:
                         continue  
@@ -103,7 +103,7 @@ def classify_images(target_date: str = None):
 
                 # Update CSV with predictions
                 df.loc[df['timestamp'] == next_date, 'predicted_label'] = predictions
-                df.to_csv(CSV_PATH, index=False)  # 🔴 Write updated results to the mounted CSV
+                df.to_csv(CSV_PATH, index=False)  # 
                 logging.info(f"Processed {IMAGES_PROCESSED_COUNT} images for {next_date.strftime('%Y-%m-%d')}.")
 
             next_date += datetime.timedelta(days=1)  # Move to next date
@@ -133,7 +133,7 @@ def home():
 @app.get("/next_date")
 def get_next_date():
     """Check the next scheduled processing date."""
-    df = pd.read_csv(CSV_PATH)  # 🔴 Read from mounted CSV
+    df = pd.read_csv(CSV_PATH)  
     df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce').dt.date
     last_processed_date = df[df['predicted_label'].notna()]['timestamp'].max() if 'predicted_label' in df.columns else START_DATE
     return {"next_processing_date": (last_processed_date + datetime.timedelta(days=1)).strftime('%Y-%m-%d')}
@@ -144,8 +144,32 @@ def manual_trigger(date: str = None):
     result = classify_images(target_date=date)
     return {"message": result}
 
-@app.get("/list_images")
-def list_images():
-    """Returns a list of available images in the dataset directory."""
-    image_files = [f for f in os.listdir(os.path.join(DATA_DIR, "images")) if f.endswith(('.jpg', '.png'))]
-    return {"available_images": image_files}
+# 5-Minute Trigger (Only for Testing)
+@app.post("/start_5min_trigger")
+def start_test_trigger():
+    """Manually starts the 5-minute batch processing test."""
+    logging.info("5-minute batch processing trigger activated.")
+
+    def process_next_day():
+        global CURRENTLY_PROCESSING
+        CURRENTLY_PROCESSING = datetime.datetime.now().strftime('%Y-%m-%d')  
+        classify_images()
+        CURRENTLY_PROCESSING = None  
+
+    scheduler.add_job(process_next_day, "interval", minutes=5, id="test_trigger", replace_existing=True)
+    return {"message": "5-minute test trigger activated!"}
+
+@app.get("/processing_status")
+def get_processing_status():
+    """Returns the currently processing date and number of images classified."""
+    return {
+        "currently_processing": CURRENTLY_PROCESSING if CURRENTLY_PROCESSING else "No batch processing running",
+        "images_processed_last_run": IMAGES_PROCESSED_COUNT
+    }
+
+@app.post("/stop_5min_trigger")
+def stop_test_trigger():
+    """Stops the manually activated 5-minute batch processing."""
+    scheduler.remove_job("test_trigger")
+    return {"message": "5-minute test trigger stopped!"}
+
