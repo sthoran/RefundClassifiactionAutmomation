@@ -131,7 +131,7 @@ df_final = pd.read_csv(csv_filename)
 print(df_final.head())  # Check the loaded paths
 
 # Split into train (80%) and test (20%) sets
-train_df, test_df = train_test_split(df, test_size=0.2, random_state=42, stratify=df["label"])
+train_df, test_df = train_test_split(df_final, test_size=0.2, random_state=42, stratify=df["label"])
 
 # Save the subsets as CSV files
 train_csv = "apparel_images_train.csv"
