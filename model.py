@@ -2,13 +2,13 @@
 import os
 import pandas as pd
 import numpy as np
-#import tensorflow as tf
+from tensorflow.keras.layers import BatchNormalization
 import mlflow
 import mlflow.tensorflow
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
-from tensorflow.keras.models import Model
+from tensorflow.keras.models import Sequential
 import matplotlib.pyplot as plt
 #%%
 # Enable MLflow autologging
@@ -57,22 +57,23 @@ train_generator = train_datagen.flow_from_dataframe(
 #%%
 # Load Pretrained ResNet50 model
 base_model = ResNet50(weights="imagenet", include_top=False, input_shape=(224, 224, 3))
-base_model.trainable = False 
+base_model.trainable = True
 
-# Build the model
-x = base_model.output
-x = GlobalAveragePooling2D()(x)
-x = Dense(256, activation="relu")(x)
-x = Dropout(0.3)(x)
-output_layer = Dense(len(train_generator.class_indices), activation="softmax")(x)
-#%%
-# Compile the model
-model = Model(inputs=base_model.input, outputs=output_layer)
+# Build the Sequential Model
+model = Sequential([
+    base_model,
+    GlobalAveragePooling2D(),
+    BatchNormalization(),
+    Dense(256, activation="relu"),
+    Dropout(0.5),
+    Dense(24, activation="softmax") 
+])
+
 model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
 
 # Print model summary
 model.summary()
-
+#%%
 # Start MLflow experiment
 with mlflow.start_run():
     mlflow.log_param("model", "ResNet50")
