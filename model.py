@@ -1,69 +1,133 @@
-#%%
+import os
 import pandas as pd
 import numpy as np
-import cv2
-import h5py
-import os
-import tqdm
-from collections import Counter
+import tensorflow as tf
+import mlflow
+import mlflow.tensorflow
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
+from tensorflow.keras.models import Model
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 
-# %% convert data to HDF5 Format
-image_folder = '/Users/user/IUBH/Semester3/frommodeltoproduction/1/images_compressed'
-csv_path = '/Users/user/IUBH/Semester3/frommodeltoproduction/1/images.csv'
-hdf5_path = 'Dataset.h5'
+# Enable MLflow autologging
+mlflow.tensorflow.autolog()
 
-# %%
-df = pd.read_csv(csv_path)
-# %%
-df.head()
-# %% add datetime metadata
+# 📌 Define Paths (Relative)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Get script directory
+DATA_DIR = os.path.join(BASE_DIR, "apparel_images_dataset")  # Main dataset directory
+CSV_PATH = os.path.join(BASE_DIR, "apparel_images_train.csv")  # CSV with relative paths
+MODEL_DIR = os.path.join(BASE_DIR, "models")  # Where to save trained model
 
-# Shuffle the dataset to ensure randomness
-df = df.sample(frac=1, random_state=42).reset_index(drop=True)
-number_entries = len(df)
-# Generate date range
-start_date = pd.Timestamp("2025-01-01")  # Change this to your desired start date
-num_days = (number_entries // 150) + 1  # Calculate the required number of days
-dates = pd.date_range(start=start_date, periods=num_days, freq='D')
+# 📌 Ensure directories exist
+os.makedirs(MODEL_DIR, exist_ok=True)
 
-# Assign dates to chunks of 150
-df['date'] = np.repeat(dates, 150)[:number_entries]
+# 📌 Load dataset
+df = pd.read_csv(CSV_PATH)
 
-df.to_csv(csv_path)
+# ✅ No need to modify paths, keep them as relative
+df["filepath"] = df["filepath"].astype(str)  # Ensure file paths are strings
 
+# 📌 Split into train & test
+train_df, test_df = train_test_split(df, test_size=0.2, stratify=df["label"], random_state=42)
 
-#%% check for duplicates
-# Count occurrences of image names in the folder
-image_files = [f for f in os.listdir(image_folder) if f.endswith(('.jpg', '.JPG', '.png'))]
-duplicates = [item for item, count in Counter(image_files).items() if count > 1]
+# 📌 Image parameters
+IMG_SIZE = (224, 224)
+BATCH_SIZE = 32
 
-# %% convert data to HDF5 format
-# Create HDF5 file
-with h5py.File(hdf5_path, "w") as f:
-    # Store labels
-    labels = df["label"].values
-    f.create_dataset("labels", data=labels)
+# 📌 Define Image Data Generators
+train_datagen = ImageDataGenerator(
+    rescale=1./255,  
+    rotation_range=30,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    fill_mode="nearest"
+)
 
-    # First image to determine shape
-    image_path = '/Users/user/IUBH/Semester3/frommodeltoproduction/1/images_compressed/ce8d7054-ee06-4412-b5df-a610943e3e50.jpg'
-    first_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    img_shape = first_img.shape  # (Height, Width, Channels)
+test_datagen = ImageDataGenerator(rescale=1./255)
 
-    #Create HDF5 dataset for images
-    img_dtype = np.uint8  # Store images as 8-bit integers
-    image_dataset = f.create_dataset("images", shape=(len(df), *img_shape), dtype=img_dtype, compression="gzip")
+# 📌 Create Data Generators using **relative paths**
+train_generator = train_datagen.flow_from_dataframe(
+    dataframe=train_df,
+    directory=BASE_DIR,  # 🔴 Base directory ensures images are loaded correctly
+    x_col="filepath",  # Paths remain unchanged (relative to BASE_DIR)
+    y_col="label",
+    target_size=IMG_SIZE,
+    batch_size=BATCH_SIZE,
+    class_mode="sparse"
+)
 
-    # Loop through images and store in HDF5
-    for i, img_id in tqdm.tqdm(enumerate(df["image"]), total=len(df)):
-        img_path = os.path.join(image_folder, img_id)+".jpg"
-        img = cv2.imread(img_path, cv2.IMREAD_COLOR)  # Read image as BGR
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert to RGB
-        # Ensure image shape is consistent (resize if necessary)
-        if img.shape != img_shape:
-            img = cv2.resize(img, (img_shape[1], img_shape[0]))
+test_generator = test_datagen.flow_from_dataframe(
+    dataframe=test_df,
+    directory=BASE_DIR,  # 🔴 Ensures images load from correct subfolders
+    x_col="filepath",
+    y_col="label",
+    target_size=IMG_SIZE,
+    batch_size=BATCH_SIZE,
+    class_mode="sparse",
+    shuffle=False
+)
 
-        # Store image in dataset
-        image_dataset[i] = img
+# 📌 Load Pretrained ResNet50 model
+base_model = ResNet50(weights="imagenet", include_top=False, input_shape=(224, 224, 3))
+base_model.trainable = False  # Freeze base model for transfer learning
 
-print("Dataset successfully stored in HDF5!")
-# %%
+# 📌 Build the model
+x = base_model.output
+x = GlobalAveragePooling2D()(x)
+x = Dense(256, activation="relu")(x)
+x = Dropout(0.3)(x)
+output_layer = Dense(len(train_generator.class_indices), activation="softmax")(x)
+
+# 📌 Compile the model
+model = Model(inputs=base_model.input, outputs=output_layer)
+model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+
+# 📌 Print model summary
+model.summary()
+
+# 📌 Start MLflow experiment
+with mlflow.start_run():
+    mlflow.log_param("model", "ResNet50")
+    
+    # Train the model
+    history = model.fit(train_generator, validation_data=test_generator, epochs=10)
+
+    # Log final accuracy
+    mlflow.log_metric("final_train_accuracy", history.history["accuracy"][-1])
+    mlflow.log_metric("final_train_loss", history.history["loss"][-1])
+
+    # Save the trained model
+    model_path = os.path.join(MODEL_DIR, "apparel_classifier_resnet50.h5")
+    model.save(model_path)
+    
+    mlflow.tensorflow.log_model(model, artifact_path="models/ResNet50")
+
+print("✅ Training complete! Model saved and logged in MLflow.")
+
+# 📌 Plot Training Curves
+plt.figure(figsize=(12, 4))
+
+# Accuracy Plot
+plt.subplot(1, 2, 1)
+plt.plot(history.history["accuracy"], label="Train Accuracy")
+plt.plot(history.history["val_accuracy"], label="Validation Accuracy")
+plt.xlabel("Epochs")
+plt.ylabel("Accuracy")
+plt.legend()
+plt.title("Training vs Validation Accuracy")
+
+# Loss Plot
+plt.subplot(1, 2, 2)
+plt.plot(history.history["loss"], label="Train Loss")
+plt.plot(history.history["val_loss"], label="Validation Loss")
+plt.xlabel("Epochs")
+plt.ylabel("Loss")
+plt.legend()
+plt.title("Training vs Validation Loss")
+
+plt.show()
