@@ -8,10 +8,8 @@ from PIL import Image
 import random
 from sklearn.model_selection import train_test_split
 
-#%% **Step 1: Define Dataset Path Dynamically**
+#%% Define Dataset Path 
 project_root = os.getcwd()  # Gets the current project directory
-
-# Allow user to specify dataset path, otherwise use default
 dataset_path = os.path.join(project_root, "apparel_images_dataset")  
 
 # Check if dataset exists before proceeding
@@ -138,6 +136,7 @@ test_csv = "apparel_images_test.csv"
 
 train_df.to_csv(train_csv, index=False)
 test_df.to_csv(test_csv, index=False)
+
 #%% **Step 9: Check Final Class Distribution**
 class_counts_final = df_final['label'].value_counts()
 
