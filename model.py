@@ -19,9 +19,7 @@ mlflow.tensorflow.autolog()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  
 DATA_DIR = os.path.join(BASE_DIR, "apparel_images_dataset") 
 df_train = pd.read_csv('apparel_images_train.csv')
-#test_CSV_PATH = os.path.join(BASE_DIR, 'apparel_images_test.csv')
 MODEL_DIR = os.path.join(BASE_DIR, "models")  
-# Ensure file paths in CSV are relative to `DATA_DIR`
 df_train["filepath"] = df_train["filepath"].str.replace("apparel_images_dataset/", "", regex=False)
 #%%
 df_train.head()
@@ -35,11 +33,14 @@ BATCH_SIZE = 32
 #%%
 # Define Image Data Generators
 train_datagen = ImageDataGenerator(
-    rescale=1./255,  
-    rotation_range=15,
-    width_shift_range=0.1,
-    height_shift_range=0.1,
-    horizontal_flip= False,
+    rescale=1./255,
+    rotation_range=30,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    brightness_range=[0.8, 1.2],
+    zoom_range=0.2,
+    shear_range=0.2,
+    horizontal_flip=True,
     fill_mode="nearest"
 )
 #%%
@@ -56,7 +57,8 @@ train_generator = train_datagen.flow_from_dataframe(
 #%%
 # Load Pretrained ResNet50 model
 base_model = ResNet50(weights="imagenet", include_top=False, input_shape=(224, 224, 3))
-base_model.trainable = True
+for layer in base_model.layers[100:]:  
+    layer.trainable = False 
 
 # Build the Sequential Model
 model = Sequential([
@@ -78,13 +80,13 @@ optimizer = Adam(
 # Recompile the model
 model.compile(
     optimizer=optimizer,
-    loss="sparse_categorical_crossentropy",  # Default assumption
+    loss= "sparse_categorical_crossentropy", 
     metrics=["accuracy"])
 #%%
 # Print model summary
 model.summary()
 
-model_name = "ResNet50_v2" 
+model_name = "ResNet50_v3" 
 model_path = os.path.join(MODEL_DIR, f"{model_name}.h5")
 #%%
 # Start MLflow experiment
@@ -93,7 +95,7 @@ with mlflow.start_run():
     
     # Train the model
     history = model.fit(train_generator, epochs=10)
-    
+#%%   
     # Log final accuracy
     mlflow.log_metric("final_train_accuracy", history.history["accuracy"][-1])
     mlflow.log_metric("final_train_loss", history.history["loss"][-1])
