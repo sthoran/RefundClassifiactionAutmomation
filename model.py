@@ -10,6 +10,7 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
 from tensorflow.keras.models import Sequential
 import matplotlib.pyplot as plt
+from tensorflow.keras.optimizers import Adam
 #%%
 # Enable MLflow autologging
 mlflow.tensorflow.autolog()
@@ -63,18 +64,25 @@ model = Sequential([
     GlobalAveragePooling2D(),
     BatchNormalization(),
     Dense(256, activation="relu"),
-    Dropout(0.5),
+    Dropout(0.3),
     Dense(24, activation="softmax") 
 ])
 
-model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-
+model.compile(
+    optimizer=Adam(learning_rate=1e-4, weight_decay=1e-4),
+    loss="sparse_categorical_crossentropy",
+    metrics=["accuracy"]  # Tracks accuracy during training
+)
+#%%
 # Print model summary
 model.summary()
+
+model_name = "ResNet50_v2" 
+model_path = os.path.join(MODEL_DIR, f"{model_name}.h5")
 #%%
 # Start MLflow experiment
 with mlflow.start_run():
-    mlflow.log_param("model", "ResNet50")
+    mlflow.log_param("model_name", model_name)
     
     # Train the model
     history = model.fit(train_generator, epochs=10)
@@ -83,12 +91,15 @@ with mlflow.start_run():
     mlflow.log_metric("final_train_accuracy", history.history["accuracy"][-1])
     mlflow.log_metric("final_train_loss", history.history["loss"][-1])
 
-    # Save the trained model
-    model_path = os.path.join(MODEL_DIR, "apparel_classifier_resnet50.h5")
     model.save(model_path)
-    
-    mlflow.tensorflow.log_model(model, artifact_path="models/ResNet50")
+    input_example = np.random.rand(1, 224, 224, 3).astype(np.float32)  # Example of a normalized image
 
+# Log model with input example
+mlflow.tensorflow.log_model(
+    model,
+    artifact_path=f"models/{model_name}",
+    input_example=input_example )
+    
 print("Training complete! Model saved and logged in MLflow.")
 
 # Plot Training Curves
@@ -111,3 +122,5 @@ plt.legend()
 plt.title("Training Loss")
 
 plt.show()
+
+# %%
