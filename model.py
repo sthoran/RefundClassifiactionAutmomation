@@ -64,11 +64,11 @@ model = Sequential([
     GlobalAveragePooling2D(),
     BatchNormalization(),
     Dense(256, activation="relu"),
-    Dropout(0.3),
+    Dropout(0.4),
     Dense(24, activation="softmax") 
 ])
 optimizer = Adam(
-    learning_rate=0.0010000000474974513,  # From MLflow log
+    learning_rate=0.0010000000474974513,  
     beta_1=0.9,
     beta_2=0.999,
     epsilon=1e-07,
@@ -93,7 +93,7 @@ with mlflow.start_run():
     
     # Train the model
     history = model.fit(train_generator, epochs=10)
-#%%
+    
     # Log final accuracy
     mlflow.log_metric("final_train_accuracy", history.history["accuracy"][-1])
     mlflow.log_metric("final_train_loss", history.history["loss"][-1])
