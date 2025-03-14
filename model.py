@@ -67,12 +67,19 @@ model = Sequential([
     Dropout(0.3),
     Dense(24, activation="softmax") 
 ])
-
-model.compile(
-    optimizer=Adam(learning_rate=1e-4, weight_decay=1e-4),
-    loss="sparse_categorical_crossentropy",
-    metrics=["accuracy"]  # Tracks accuracy during training
+optimizer = Adam(
+    learning_rate=0.0010000000474974513,  # From MLflow log
+    beta_1=0.9,
+    beta_2=0.999,
+    epsilon=1e-07,
+    amsgrad=False
 )
+
+# Recompile the model
+model.compile(
+    optimizer=optimizer,
+    loss="sparse_categorical_crossentropy",  # Default assumption
+    metrics=["accuracy"])
 #%%
 # Print model summary
 model.summary()
@@ -101,7 +108,7 @@ mlflow.tensorflow.log_model(
     input_example=input_example )
     
 print("Training complete! Model saved and logged in MLflow.")
-
+mlflow.end_run()
 # Plot Training Curves
 plt.figure(figsize=(12, 4))
 
