@@ -80,7 +80,7 @@ optimizer = Adam(
 # Recompile the model
 model.compile(
     optimizer=optimizer,
-    loss= "sparse_categorical_crossentropy", 
+    loss=   "sparse_categorical_crossentropy", 
     metrics=["accuracy"])
 #%%
 # Print model summary
