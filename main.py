@@ -10,11 +10,11 @@ from PIL import Image
 import os
 #%%
 # Paths for mounted data
-DATA_DIR = "/app/data"  
-CSV_PATH = os.path.join(DATA_DIR, "test_data.csv") 
+DATA_DIR = os.path.relpath("test_data")
+CSV_PATH = os.path.relpath("apparel_images_test.csv") 
 
 # Load the CNN model
-MODEL_PATH = os.path.join(DATA_DIR, "apparel_classifier_resnet50.h5")  
+MODEL_PATH = os.path.relpath("models/ResNet50_v2.h5") 
 model = tf.keras.models.load_model(MODEL_PATH)
 
 #%%
@@ -43,7 +43,7 @@ app = FastAPI()
 # Image Preprocessing Function (Uses Mounted Data)
 def preprocess_image(image_name):
     """Preprocess an image before classification."""
-    image_path = os.path.join(DATA_DIR, "images", image_name) 
+    image_path = os.path.join(DATA_DIR,image_name)
     try:
         img = Image.open(image_path).convert("RGB")
         img = img.resize((224, 224))  # Resize for the CNN model
@@ -89,7 +89,7 @@ def classify_images(target_date: str = None):
             else:
                 predictions = []
                 for _, row in day_images.iterrows():
-                    image_name = os.path.basename(row['filepath'])  
+                    image_name = os.path.relpath(row["filepath"], "test_data")  
                     img = preprocess_image(image_name)
                     if img is None:
                         continue  
@@ -102,7 +102,7 @@ def classify_images(target_date: str = None):
                     IMAGES_PROCESSED_COUNT += 1  # Track images classified
 
                 # Update CSV with predictions
-                df.loc[df['timestamp'] == next_date, 'predicted_label'] = predictions
+                df.loc[df['timestamp'] == next_date, 'predicted_label'] = pd.Series(predictions, index=day_images.index)
                 df.to_csv(CSV_PATH, index=False)  # 
                 logging.info(f"Processed {IMAGES_PROCESSED_COUNT} images for {next_date.strftime('%Y-%m-%d')}.")
 
