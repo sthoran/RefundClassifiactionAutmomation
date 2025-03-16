@@ -3,4 +3,4 @@ prod/
 __pycache__/
 .DS_Store
 apparel_images_dataset/
-
+ResNet50_v2.h5
