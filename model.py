@@ -2,15 +2,10 @@
 import os
 import pandas as pd
 import numpy as np
-from tensorflow.keras.layers import BatchNormalization
+import tensorflow as tf
 import mlflow
 import mlflow.tensorflow
-from tensorflow.keras.applications import ResNet50
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
-from tensorflow.keras.models import Sequential
 import matplotlib.pyplot as plt
-from tensorflow.keras.optimizers import Adam
 #%%
 # Enable MLflow autologging
 mlflow.tensorflow.autolog()
@@ -32,7 +27,7 @@ IMG_SIZE = (224, 224)
 BATCH_SIZE = 32
 #%%
 # Define Image Data Generators
-train_datagen = ImageDataGenerator(
+train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
     rescale=1./255,
     rotation_range=30,
     width_shift_range=0.2,
@@ -56,20 +51,20 @@ train_generator = train_datagen.flow_from_dataframe(
 )
 #%%
 # Load Pretrained ResNet50 model
-base_model = ResNet50(weights="imagenet", include_top=False, input_shape=(224, 224, 3))
+base_model = tf.keras.applications.ResNet50(weights="imagenet", include_top=False, input_shape=(224, 224, 3))
 for layer in base_model.layers[100:]:  
     layer.trainable = False 
 
 # Build the Sequential Model
-model = Sequential([
+model = tf.keras.models.Sequential([
     base_model,
-    GlobalAveragePooling2D(),
-    BatchNormalization(),
-    Dense(256, activation="relu"),
-    Dropout(0.4),
-    Dense(24, activation="softmax") 
+    tf.keras.layers.GlobalAveragePooling2D(),
+    tf.keras.layers.BatchNormalization(),
+    tf.keras.layers.Dense(256, activation="relu"),
+    tf.keras.layers.Dropout(0.4),
+    tf.keras.layers.Dense(24, activation="softmax") 
 ])
-optimizer = Adam(
+optimizer = tf.keras.optimizers.Adam(
     learning_rate=0.0010000000474974513,  
     beta_1=0.9,
     beta_2=0.999,
