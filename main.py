@@ -6,7 +6,7 @@ import numpy as np
 import datetime
 import os
 from PIL import Image
-
+test="t"
 # Define relative paths
 DATA_DIR = os.path.relpath("test_data")
 CSV_PATH = os.path.relpath("apparel_images_test.csv") 
