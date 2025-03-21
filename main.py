@@ -163,11 +163,18 @@ def start_test_trigger():
         CURRENTLY_PROCESSING = START_DATE  
 
     def process_next_day():
-        global CURRENTLY_PROCESSING
-        if CURRENTLY_PROCESSING is None:
-            CURRENTLY_PROCESSING = START_DATE 
-        classify_images(target_date=CURRENTLY_PROCESSING.strftime("%Y-%m-%d"))
-        CURRENTLY_PROCESSING += datetime.timedelta(days=1)  
+        def process_next_day():
+            global CURRENTLY_PROCESSING
+
+            if CURRENTLY_PROCESSING is None:
+                CURRENTLY_PROCESSING = START_DATE
+
+            print(f"[DEBUG] Running classification for {CURRENTLY_PROCESSING}")
+            result = classify_images(target_date=CURRENTLY_PROCESSING.strftime("%Y-%m-%d"))
+            print(f"[DEBUG] Result: {result}")
+
+            CURRENTLY_PROCESSING += datetime.timedelta(days=1)
+    
 
     # Schedule the process every 1 minute
     scheduler.add_job(process_next_day, "interval", minutes=1, id="test_trigger", replace_existing=True)
