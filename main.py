@@ -124,7 +124,6 @@ def classify_images(target_date: str = None):
         }
 
     except Exception as e:
-        CURRENTLY_PROCESSING = None
         return {
             "message": f"Error: {str(e)}",
             "images_processed_count": IMAGES_PROCESSED_COUNT  
