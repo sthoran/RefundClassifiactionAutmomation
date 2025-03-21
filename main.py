@@ -85,8 +85,9 @@ def classify_images(target_date: str = None):
                 predictions = []
                 for _, row in day_images.iterrows():
                     # Construct full image URL
-                    image_s3_path = f"{data_url}/{row['filepath']}".replace("//", "/")
-                    image_url = image_s3_path if image_s3_path.startswith("http") else f"{bucket_url}/{row['filepath']}"
+                    #image_s3_path = f"{data_url}/{row['filepath']}".replace("//", "/")
+                    image_url = f"{bucket_url}/{row['filepath']}".replace(" ", "%20")
+
 
                     # Download image temporarily
                     local_temp_path = "/tmp/temp_image.jpg"
