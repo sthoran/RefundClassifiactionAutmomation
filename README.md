@@ -16,14 +16,6 @@ It is designed to automatically classify daily image batches stored in an AWS S3
 
 ---
 
-##  Project Structure
-. ├── main.py # FastAPI app and scheduler
-├── modified_predictions.csv # Output file with predictions (generated) 
-├── requirements.txt # Python dependencies
-└── README.md # This file
-
----
-
 ## Getting Started
 
 ### 1. clone repository
