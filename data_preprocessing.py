@@ -1,4 +1,4 @@
-#%% Import Necessary Libraries
+
 import os
 import pandas as pd
 from datetime import datetime, timedelta
@@ -18,7 +18,7 @@ if not os.path.exists(dataset_path):
 
 print(f"Dataset path found: {dataset_path}")
 
-#%% **Step 2: Store Image Paths and Labels in DataFrame (Using Relative Paths)**
+#%%  Store Image Paths and Labels in DataFrame (Using Relative Paths)
 data = []
 
 # Loop through folders and store file paths, labels
@@ -27,13 +27,13 @@ for label in os.listdir(dataset_path):
     if os.path.isdir(label_path): 
         for img_name in os.listdir(label_path):
             img_path = os.path.join(label_path, img_name)
-            relative_img_path = os.path.relpath(img_path, project_root)  # Convert to relative path
-            data.append([relative_img_path, label])  # Store relative paths
+            relative_img_path = os.path.relpath(img_path, project_root) 
+            data.append([relative_img_path, label])  
 
 # Convert to DataFrame
 df = pd.DataFrame(data, columns=["filepath", "label"])
 
-#%% **Step 3: Check Class Distribution**
+#%% Check Class Distribution**
 class_counts = df['label'].value_counts()
 
 # Plot class distribution
@@ -45,7 +45,7 @@ plt.ylabel("Number of Images")
 plt.xticks(rotation=90)
 plt.show()
 
-#%% **Step 4: Perform Data Augmentation**
+#%% Perform Data Augmentation**
 # Define augmentation parameters
 datagen = tf.keras.preprocessing.image.ImageDataGenerator(
     rotation_range=30,
@@ -59,7 +59,7 @@ datagen = tf.keras.preprocessing.image.ImageDataGenerator(
 
 # Track new augmented data
 augmented_data = []
-min_images = 500  # Minimum number of images per class
+min_images = 500 
 
 for label, count in class_counts.items():
     if count < min_images:
@@ -68,14 +68,14 @@ for label, count in class_counts.items():
         images = os.listdir(label_dir)
 
         for i in range(needed):
-            img_name = random.choice(images)  # Pick a random existing image
+            img_name = random.choice(images) 
             img_path = os.path.join(label_dir, img_name)
 
             # Load and preprocess image
             img = Image.open(img_path)
-            img = img.resize((224, 224))  # Resize for consistency
+            img = img.resize((224, 224))  
             img_array = tf.keras.preprocessing.image.img_to_array(img)
-            img_array = img_array.reshape((1,) + img_array.shape)  # Reshape for augmentation
+            img_array = img_array.reshape((1,) + img_array.shape)  
 
             # Extract original filename without extension
             original_name, ext = os.path.splitext(img_name)
@@ -83,30 +83,30 @@ for label, count in class_counts.items():
             save_format = ext[1:]
 
             for batch in datagen.flow(img_array, batch_size=1, save_to_dir=label_dir, save_prefix=save_prefix, save_format=save_format):
-                break  # Generate only one image per iteration
+                break  
             
             # Find the newly saved augmented image
             new_augmented_file = None
             for file in os.listdir(label_dir):
                 if file.startswith(f"aug_{original_name}") and file.endswith(ext):
                     new_augmented_file = os.path.join(label_dir, file)
-                    break  # Take the first match
+                    break  
 
             if new_augmented_file:
-                relative_augmented_path = os.path.relpath(new_augmented_file, project_root)  # Convert to relative
+                relative_augmented_path = os.path.relpath(new_augmented_file, project_root) 
                 augmented_data.append([relative_augmented_path, label])
 
 # Convert augmented data to DataFrame
 df_augmented = pd.DataFrame(augmented_data, columns=["filepath", "label"])
 
-#%% **Step 5: Append Augmented Data to Original DataFrame**
+#%%  Append Augmented Data to Original DataFrame
 df_final = pd.concat([df, df_augmented], ignore_index=True)
 
 # Shuffle the dataset to ensure randomness
 df_final = df_final.sample(frac=1, random_state=42).reset_index(drop=True)
 
-#%% **Step 6: Assign Timestamps in Batches of 200 (Randomized)**
-start_date = datetime(2025, 1, 1)  # Initialize start date
+#%%  Assign Timestamps in Batches of 200 (Randomized)
+start_date = datetime(2025, 1, 1) 
 
 timestamps = []
 for i in range(0, len(df_final), 200):
@@ -117,12 +117,12 @@ for i in range(0, len(df_final), 200):
 # Add timestamp column to DataFrame
 df_final["timestamp"] = timestamps
 
-#%% **Step 7: Save Final Dataset with Relative Paths**
+#%% Save Final Dataset with Relative Paths
 csv_filename = "apparel_images_balanced_with_dates.csv"
 df_final.to_csv(csv_filename, index=False)
 print(f"Augmented data saved! Total dataset size: {len(df_final)}")
 
-#%% **Step 8: Read CSV and Convert Back to Full Paths for Use**
+#%%  Read CSV and Convert Back to Full Paths for Use
 df_final = pd.read_csv(csv_filename)
 
 print(df_final.head())  # Check the loaded paths
@@ -137,7 +137,7 @@ test_csv = "apparel_images_test.csv"
 train_df.to_csv(train_csv, index=False)
 test_df.to_csv(test_csv, index=False)
 
-#%% **Step 9: Check Final Class Distribution**
+#%%  Check Final Class Distribution
 class_counts_final = df_final['label'].value_counts()
 
 # Plot final class distribution
