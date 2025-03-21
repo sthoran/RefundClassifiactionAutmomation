@@ -156,24 +156,17 @@ def manual_trigger(target_date):
 @app.post("/start_1min_trigger")
 def start_test_trigger():
     """Starts a test trigger to classify one day's images every 1 minute."""
-    global CURRENTLY_PROCESSING
-
-    # Ensure CURRENTLY_PROCESSING is initialized
-    if CURRENTLY_PROCESSING is None:
-        CURRENTLY_PROCESSING = START_DATE  
-
     def process_next_day():
-        def process_next_day():
-            global CURRENTLY_PROCESSING
+        global CURRENTLY_PROCESSING
 
-            if CURRENTLY_PROCESSING is None:
-                CURRENTLY_PROCESSING = START_DATE
+        if CURRENTLY_PROCESSING is None:
+            CURRENTLY_PROCESSING = START_DATE
 
-            print(f"[DEBUG] Running classification for {CURRENTLY_PROCESSING}")
-            result = classify_images(target_date=CURRENTLY_PROCESSING.strftime("%Y-%m-%d"))
-            print(f"[DEBUG] Result: {result}")
+        print(f"[DEBUG] Running classification for {CURRENTLY_PROCESSING}")
+        result = classify_images(target_date=CURRENTLY_PROCESSING.strftime("%Y-%m-%d"))
+        print(f"[DEBUG] Result: {result}")
 
-            CURRENTLY_PROCESSING += datetime.timedelta(days=1)
+        CURRENTLY_PROCESSING += datetime.timedelta(days=1)
     
 
     # Schedule the process every 1 minute
