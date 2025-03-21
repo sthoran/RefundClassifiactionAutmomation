@@ -59,13 +59,13 @@ http://127.0.0.1:8000/docs
 ## API Endpoints
 
 Method	Endpoint	Description
-GET	/	Health check
-GET	/next_date	Shows the next date to be processed
-GET	/download_csv	Downloads the predictions CSV
-GET	/list_jobs	Lists all running scheduled jobs
-POST	/trigger?target_date=YYYY-MM-DD	Manually trigger classification for a given date
-POST	/start_1min_trigger	Starts test trigger to classify daily images every 1 min
-POST	/stop_1min_trigger	Stops the test trigger
+- GET	/	Health check
+- GET	/next_date	Shows the next date to be processed
+- GET	/download_csv	Downloads the predictions CSV
+- GET	/list_jobs	Lists all running scheduled jobs
+- POST	/trigger?target_date=YYYY-MM-DD	Manually trigger classification for a given date
+- POST	/start_1min_trigger	Starts test trigger to classify daily images every 1 min
+- POST	/stop_1min_trigger	Stops the test trigger
 
 
 ## How scheduler works
