@@ -28,7 +28,7 @@ It is designed to automatically classify daily image batches stored in an AWS S3
 
 ### 1. clone repository
 ```bash
-git clone https://github.com/sthoran/RefundClassifiactionAutmomation.git
+git clone https://github.com/sthoran/RefundClassifiactionAutmomation.git ```
 
 cd RefundClassifiactionAutmomation.git
 
