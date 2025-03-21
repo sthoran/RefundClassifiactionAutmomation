@@ -1,22 +1,31 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from apscheduler.schedulers.background import BackgroundScheduler
 import tensorflow as tf
 import pandas as pd
 import numpy as np
 import datetime
+import requests
 import os
 from PIL import Image
-test="t"
-# Define relative paths
-DATA_DIR = os.path.relpath("test_data")
-CSV_PATH = os.path.relpath("apparel_images_test.csv") 
-MODEL_PATH = os.path.relpath("models/ResNet50_v2.h5")
 
-# Load the CNN model
-if os.path.exists(MODEL_PATH):
-    model = tf.keras.models.load_model(MODEL_PATH)
-else:
-    raise FileNotFoundError(f"Model file not found at {MODEL_PATH}")
+#%%
+bucket_url = 'https://refund-234.s3.amazonaws.com'
+model_url = f"{bucket_url}/models/ResNet50_v2.h5"
+csv_url = f"{bucket_url}/metadata/apparel_images_test.csv"
+data_url = f"{bucket_url}/data/"
+
+model_path = "/tmp/my_model.h5"  
+
+# Step 1: Download the model file
+response = requests.get(model_url)
+response.raise_for_status()  
+
+with open(model_path, "wb") as f:
+    f.write(response.content)
+
+# Step 2: Load the model
+model = tf.keras.models.load_model(model_path)
+
 
 # Class labels
 CLASS_NAMES = [
@@ -55,7 +64,7 @@ def classify_images(target_date: str = None):
     global CURRENTLY_PROCESSING, IMAGES_PROCESSED_COUNT
 
     try:
-        df = pd.read_csv(CSV_PATH)
+        df = pd.read_csv(csv_url)
         df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce').dt.date
 
         # Determine the date to process
@@ -90,7 +99,7 @@ def classify_images(target_date: str = None):
 
                 if len(predictions) == len(day_images):
                     df.loc[df['timestamp'] == next_date, 'predicted_label'] = predictions
-                    df.to_csv(CSV_PATH, index=False)
+                    df.to_csv("modified_predictions.csv", index=False)
 
             CURRENTLY_PROCESSING += datetime.timedelta(days=1)  
         
@@ -124,7 +133,7 @@ def get_next_date():
 
 @app.post("/trigger")
 def manual_trigger(target_date):
-    """Manually trigger classification for a specific image."""
+    """Manually trigger classification for a specific date."""
     result = classify_images(target_date=CURRENTLY_PROCESSING.strftime("%Y-%m-%d"))
     return result
 
@@ -148,13 +157,23 @@ def start_test_trigger():
     
     return {"message": "1-minute test trigger activated!"}
 
-@app.get("/processing_status")
-def get_processing_status():
-    """Returns the currently processing date and number of images classified."""
-    return {
-        "currently_processing": CURRENTLY_PROCESSING if CURRENTLY_PROCESSING else "No batch processing running",
-        "images_processed_last_run": IMAGES_PROCESSED_COUNT
-    }
+@app.get("/download_csv")
+def download_csv():
+    file_path = "modified_predictions.csv"
+
+    if not os.path.exists(file_path):
+        return {"error": "CSV file not found. Please generate it first."}
+
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    return Response(
+        content=content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=modified_predictions.csv"
+        }
+    )
 
 @app.get("/list_jobs")
 def list_jobs():
