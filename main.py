@@ -16,14 +16,12 @@ data_url = f"{bucket_url}/data/"
 
 model_path = "/tmp/my_model.h5"  
 
-# Step 1: Download the model file
 response = requests.get(model_url)
 response.raise_for_status()  
 
 with open(model_path, "wb") as f:
     f.write(response.content)
 
-# Step 2: Load the model
 model = tf.keras.models.load_model(model_path)
 
 
@@ -85,10 +83,26 @@ def classify_images(target_date: str = None):
             if not day_images.empty:
                 predictions = []
                 for _, row in day_images.iterrows():
-                    image_path = row['filepath']
-                    img = preprocess_image(image_path)
+                    # Construct full image URL
+                    image_s3_path = f"{data_url}/{row['filepath']}".replace("//", "/")
+                    image_url = image_s3_path if image_s3_path.startswith("http") else f"{bucket_url}/{row['filepath']}"
+
+                    # Download image temporarily
+                    local_temp_path = "/tmp/temp_image.jpg"
+                    img_response = requests.get(image_url)
+
+                    if img_response.status_code == 200:
+                        with open(local_temp_path, "wb") as f:
+                            f.write(img_response.content)
+
+                        img = preprocess_image(local_temp_path)
+
+                        os.remove(local_temp_path)  # Clean up
+                    else:
+                        img = None   
+                        
                     if img is None:
-                        continue  
+                        continue 
                     pred = model.predict(img)[0]
                     top_class_idx = np.argmax(pred)
                     top_class_name = CLASS_NAMES[top_class_idx]
@@ -119,6 +133,7 @@ def classify_images(target_date: str = None):
 scheduler = BackgroundScheduler()
 scheduler.add_job(classify_images, "cron", hour=0, minute=0, id="midnight_trigger")
 scheduler.start()
+print("Trigger scheduler started")
 
 # API Endpoints
 @app.get("/")
