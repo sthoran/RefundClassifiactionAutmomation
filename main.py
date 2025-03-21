@@ -1,3 +1,4 @@
+#%%
 from fastapi import FastAPI, Response
 from apscheduler.schedulers.background import BackgroundScheduler
 import tensorflow as tf
@@ -164,6 +165,8 @@ def start_test_trigger():
 
     def process_next_day():
         global CURRENTLY_PROCESSING
+        if CURRENTLY_PROCESSING is None:
+            CURRENTLY_PROCESSING = START_DATE 
         classify_images(target_date=CURRENTLY_PROCESSING.strftime("%Y-%m-%d"))
         CURRENTLY_PROCESSING += datetime.timedelta(days=1)  
 
@@ -200,3 +203,5 @@ def stop_test_trigger():
     """Stops the 1-minute test trigger."""
     scheduler.remove_job("test_trigger")
     return {"message": "1-minute test trigger stopped!"}
+
+# %%
