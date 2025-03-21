@@ -27,20 +27,23 @@ It is designed to automatically classify daily image batches stored in an AWS S3
 ## Getting Started
 
 ### 1. clone repository
-```bash
-git clone https://github.com/sthoran/RefundClassifiactionAutmomation.git ```
+```
+bash
+git clone https://github.com/sthoran/RefundClassifiactionAutmomation.git
 
 cd RefundClassifiactionAutmomation.git
-
+```
 ### 2. install dependencies
 
-```bash
+```
+bash
 pip install -r requirements.txt
-
+```
 ### 3. Run API
-```bash
+```
+bash
 uvicorn main:app --reload
-
+```
 ### 4. open Swagger ui 
 
 output:
@@ -49,9 +52,10 @@ Example INFO:     Uvicorn running on http://127.0.0.1:8000
 
 type the following to access swagger ui in browser
 
-``` browser
+```
+browser
 http://127.0.0.1:8000/docs
-
+```
 ## API Endpoints
 
 Method	Endpoint	Description
