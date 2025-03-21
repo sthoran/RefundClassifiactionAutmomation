@@ -4,3 +4,7 @@ __pycache__/
 .DS_Store
 apparel_images_dataset/
 ResNet50_v2.h5
+test_data/
+apparel_images_balanced_with_dates.csv
+apparel_images_test.csv
+apparel_images_train.csv
