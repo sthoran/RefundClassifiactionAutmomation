@@ -1,4 +1,4 @@
-#%%
+
 from fastapi import FastAPI, Response
 from apscheduler.schedulers.background import BackgroundScheduler
 import tensorflow as tf
@@ -9,7 +9,7 @@ import requests
 import os
 from PIL import Image
 
-#%%
+
 bucket_url = 'https://refund-234.s3.amazonaws.com'
 model_url = f"{bucket_url}/models/ResNet50_v2.h5"
 csv_url = f"{bucket_url}/metadata/apparel_images_test.csv"
@@ -84,11 +84,9 @@ def classify_images(target_date: str = None):
             if not day_images.empty:
                 predictions = []
                 for _, row in day_images.iterrows():
-                    # Construct full image URL
-                    #image_s3_path = f"{data_url}/{row['filepath']}".replace("//", "/")
                     image_url = f"{bucket_url}/{row['filepath']}".replace(" ", "%20")
-
-
+                    
+                    
                     # Download image temporarily
                     local_temp_path = "/tmp/temp_image.jpg"
                     img_response = requests.get(image_url)
@@ -99,7 +97,7 @@ def classify_images(target_date: str = None):
 
                         img = preprocess_image(local_temp_path)
 
-                        os.remove(local_temp_path)  # Clean up
+                        os.remove(local_temp_path) 
                     else:
                         img = None   
                         
@@ -203,5 +201,3 @@ def stop_test_trigger():
     """Stops the 1-minute test trigger."""
     scheduler.remove_job("test_trigger")
     return {"message": "1-minute test trigger stopped!"}
-
-# %%
